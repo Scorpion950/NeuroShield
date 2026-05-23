@@ -1,0 +1,13 @@
+{
+  "name": "neuroshield-root",
+  "version": "1.0.0",
+  "description": "NeuroShield - AI Security Threat Monitoring Platform",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix minibank && npm install --prefix frontend",
+    "start": "concurrently \"npm run start --prefix backend\" \"npm run start --prefix minibank\" \"npm run dev --prefix frontend\"",
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run start --prefix minibank\" \"npm run dev --prefix frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

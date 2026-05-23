@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniBank - Secure Banking Portal</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #e2e8f0; }
+    .bank-logo { font-size: 2.5rem; font-weight: 800; color: #3b82f6; margin-bottom: 0.5rem; letter-spacing: -1px; }
+    .bank-logo span { color: #10b981; }
+    .subtitle { color: #94a3b8; margin-bottom: 2rem; font-size: 0.9rem; }
+    .card { background: rgba(30,41,59,0.9); border: 1px solid rgba(59,130,246,0.2); border-radius: 16px; padding: 2.5rem; width: 400px; max-width: 95vw; backdrop-filter: blur(20px); }
+    h2 { font-size: 1.3rem; margin-bottom: 1.5rem; color: #f1f5f9; }
+    .form-group { margin-bottom: 1.2rem; }
+    label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.4rem; }
+    input { width: 100%; padding: 0.75rem 1rem; background: rgba(15,23,42,0.8); border: 1px solid rgba(59,130,246,0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.95rem; outline: none; transition: border-color 0.2s; }
+    input:focus { border-color: #3b82f6; }
+    .btn { width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; border-radius: 8px; color: white; font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.9; }
+    .info { margin-top: 1.5rem; padding: 1rem; background: rgba(59,130,246,0.1); border-radius: 8px; font-size: 0.8rem; color: #94a3b8; }
+    .info strong { color: #60a5fa; }
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.7rem; font-weight: 600; background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.3); margin-bottom: 1rem; }
+    .error { color: #f87171; font-size: 0.85rem; margin-top: 0.5rem; display: none; }
+    .success { color: #34d399; font-size: 0.85rem; margin-top: 0.5rem; display: none; }
+    .sim-section { margin-top: 2rem; padding-top: 2rem; border-top: 1px solid rgba(59,130,246,0.1); }
+    .sim-title { font-size: 0.85rem; color: #94a3b8; margin-bottom: 1rem; }
+    .sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .sim-btn { padding: 0.5rem; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; color: #f87171; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
+    .sim-btn:hover { background: rgba(239,68,68,0.2); }
+    .sim-status { margin-top: 0.5rem; font-size: 0.75rem; color: #fbbf24; }
+  </style>
+</head>
+<body>
+  <div class="bank-logo">Mini<span>Bank</span></div>
+  <p class="subtitle">Secure Digital Banking — NeuroShield Demo Environment</p>
+
+  <div class="card">
+    <div class="badge">🔴 Monitored by NeuroShield</div>
+    <h2>🏦 Customer Login</h2>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="username" placeholder="Enter username" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="Enter password" />
+    </div>
+    <button class="btn" onclick="login()">Sign In Securely</button>
+    <div class="error" id="error-msg"></div>
+    <div class="success" id="success-msg"></div>
+
+    <div class="info">
+      <strong>Demo Accounts:</strong><br/>
+      john.doe / password123 | jane.smith / securepass<br/>
+      admin / admin@minibank
+    </div>
+
+    <div class="sim-section">
+      <div class="sim-title">⚠️ Attack Simulation (Demo)</div>
+      <div class="sim-grid">
+        <button class="sim-btn" onclick="simulate('brute-force')">💥 Brute Force</button>
+        <button class="sim-btn" onclick="simulate('sql-injection')">💉 SQL Injection</button>
+        <button class="sim-btn" onclick="simulate('suspicious-login')">🌍 Suspicious Login</button>
+        <button class="sim-btn" onclick="simulate('api-abuse')">🔄 API Abuse</button>
+        <button class="sim-btn" onclick="simulate('unauthorized-admin')">🚫 Unauth Admin</button>
+        <button class="sim-btn" onclick="simulate('privilege-escalation')">⬆️ Priv Escalation</button>
+        <button class="sim-btn" onclick="simulate('abnormal-behavior')">🤖 Abnormal Behavior</button>
+        <button class="sim-btn" onclick="simulate('credential-stuffing')">📋 Cred Stuffing</button>
+      </div>
+      <div style="margin-top:0.5rem">
+        <button class="sim-btn" style="width:100%;background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3);color:#fbbf24" onclick="simulate('all')">🚨 Run ALL Attack Scenarios</button>
+      </div>
+      <div class="sim-status" id="sim-status"></div>
+    </div>
+  </div>
+
+  <script>
+    const BASE = '';
+    async function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const errEl = document.getElementById('error-msg');
+      const sucEl = document.getElementById('success-msg');
+      errEl.style.display = 'none'; sucEl.style.display = 'none';
+      try {
+        const res = await fetch(`${BASE}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+        const data = await res.json();
+        if (data.success) { sucEl.textContent = `Welcome back, ${username}! (${data.user.role})`; sucEl.style.display = 'block'; }
+        else { errEl.textContent = data.message; errEl.style.display = 'block'; }
+      } catch(e) { errEl.textContent = 'Connection error.'; errEl.style.display = 'block'; }
+    }
+    async function simulate(type) {
+      const statusEl = document.getElementById('sim-status');
+      statusEl.textContent = `🔄 Running ${type} simulation...`;
+      try {
+        const res = await fetch(`${BASE}/simulate/${type}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ attempts: 10, count: 8, requests: 65 }) });
+        const data = await res.json();
+        statusEl.textContent = `✅ ${data.message}`;
+        setTimeout(() => { statusEl.textContent = ''; }, 5000);
+      } catch(e) { statusEl.textContent = `❌ Simulation failed: ${e.message}`; }
+    }
+    document.getElementById('password').addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
+  </script>
+</body>
+</html>

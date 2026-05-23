@@ -116,10 +116,7 @@ const PORT = config.PORT;
 server.listen(PORT, () => {
   console.log(`\n🛡️  NeuroShield Platform running on port ${PORT}`);
   console.log(`📡 WebSocket server ready at ws://localhost:${PORT}/ws`);
-  console.log(`🔗 API available at http://localhost:${PORT}/api`);
-  console.log(`\n📋 Default Admin Credentials:`);
-  console.log(`   Username: yash     | Password: Yash123`);
-  console.log(`   Username: shravani | Password: Shravani\n`);
+  console.log(`🔗 API available at http://localhost:${PORT}/api\n`);
 });
 
 module.exports = { app, server };

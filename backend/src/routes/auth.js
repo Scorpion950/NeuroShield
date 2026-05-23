@@ -49,6 +49,11 @@ router.get('/me', authMiddleware, (req, res) => {
 // POST /api/auth/users - Create new admin (super_admin only)
 router.post('/users', authMiddleware, (req, res) => {
   try {
+    const SUPER_ADMINS = ['yash', 'shravani'];
+    if (!SUPER_ADMINS.includes(req.user.username?.toLowerCase())) {
+      return res.status(403).json({ success: false, message: 'Only super admins can create admin accounts.' });
+    }
+
     const { username, password, email, role } = req.body;
     if (!username || !password) {
       return res.status(400).json({ success: false, message: 'Username and password required.' });
@@ -65,7 +70,7 @@ router.post('/users', authMiddleware, (req, res) => {
     db.prepare(`
       INSERT INTO users (id, username, password, email, role, created_by)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, username, hash, email || null, role || 'admin', req.user.username);
+    `).run(id, username, hash, email || null, 'admin', req.user.username);
 
     return res.status(201).json({ success: true, message: 'Admin account created successfully.', userId: id });
   } catch (err) {

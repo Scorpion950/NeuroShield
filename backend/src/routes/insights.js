@@ -8,20 +8,24 @@ const router = express.Router();
 router.get('/summary', authMiddleware, (req, res) => {
   try {
     const db = getDb();
-    const today = new Date().toISOString().split('T')[0];
+    // Use 24h rolling window to handle IST/UTC offset (IST = UTC+5:30)
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
     const alerts = db.prepare(`
       SELECT * FROM alerts WHERE created_at >= ? ORDER BY created_at DESC
-    `).all(today + 'T00:00:00.000Z');
+    `).all(cutoff);
 
     const summary = generateDailySummary(alerts);
     const topThreats = db.prepare(`
       SELECT attack_type, COUNT(*) as count, MAX(severity) as max_severity
       FROM alerts WHERE created_at >= ? GROUP BY attack_type ORDER BY count DESC LIMIT 5
-    `).all(today + 'T00:00:00.000Z');
+    `).all(cutoff);
 
     const affectedApps = db.prepare(`
-      SELECT source_app, COUNT(*) as alert_count FROM alerts WHERE created_at >= ? GROUP BY source_app ORDER BY alert_count DESC
-    `).all(today + 'T00:00:00.000Z');
+      SELECT source_app, COUNT(*) as alert_count
+      FROM alerts WHERE created_at >= ?
+      GROUP BY source_app ORDER BY alert_count DESC
+    `).all(cutoff);
 
     res.json({ success: true, summary, topThreats, affectedApps, alertCount: alerts.length });
   } catch (err) {

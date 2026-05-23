@@ -14,7 +14,9 @@ export function AlertProvider({ children }) {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    // In dev Vite runs on 5173/5174 but WS backend is on 5000
+    const backendHost = window.location.hostname + ':5000';
+    const ws = new WebSocket(`${protocol}//${backendHost}/ws`);
     wsRef.current = ws;
 
     ws.onopen = () => {

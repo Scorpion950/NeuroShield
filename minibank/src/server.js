@@ -37,9 +37,7 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n🏦 MiniBank running on http://localhost:${PORT}`);
-  console.log(`🔗 Forwarding logs to NeuroShield at ${process.env.NEUROSHIELD_URL || 'http://localhost:5000'}`);
-  console.log(`🎯 Attack simulations available at http://localhost:${PORT}/simulate/*\n`);
+  console.log(`\n🏦 MiniBank running on http://localhost:${PORT}\n`);
 });
 
 module.exports = app;

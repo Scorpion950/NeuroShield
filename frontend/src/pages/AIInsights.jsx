@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { insightsApi } from '../api/client';
 import { Brain, AlertTriangle, Clock, Lightbulb, TrendingUp, Shield, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { alertsApi } from '../api/client';
 import toast from 'react-hot-toast';
+
+// SQLite stores UTC without 'Z' — append it so date-fns parses correctly
+const parseUTC = (ts) => ts ? new Date(ts.endsWith('Z') ? ts : ts + 'Z') : null;
 
 function InsightPanel({ alert, insight, onBack }) {
   return (
@@ -28,7 +31,7 @@ function InsightPanel({ alert, insight, onBack }) {
           <div><div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Application</div>
             <div style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>{alert.source_app || 'N/A'}</div></div>
           <div><div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Detected</div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{alert.created_at ? formatDistanceToNow(new Date(alert.created_at), { addSuffix: true }) : 'N/A'}</div></div>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{alert.created_at ? formatDistanceToNow(parseUTC(alert.created_at), { addSuffix: true }) : 'N/A'}</div></div>
         </div>
       </div>
 
@@ -86,7 +89,7 @@ function InsightPanel({ alert, insight, onBack }) {
                 <div key={i} className="timeline-item">
                   <div className="timeline-dot" />
                   <div className="timeline-content">
-                    <div className="timeline-time">{t.time ? formatDistanceToNow(new Date(t.time), { addSuffix: true }) : ''}</div>
+                    <div className="timeline-time">{t.time ? formatDistanceToNow(parseUTC(t.time), { addSuffix: true }) : ''}</div>
                     <div className="timeline-event">{t.event}</div>
                   </div>
                 </div>

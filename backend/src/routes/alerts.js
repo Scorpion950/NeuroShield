@@ -20,7 +20,16 @@ router.get('/', authMiddleware, (req, res) => {
     if (from) { query += ' AND created_at >= ?'; params.push(from); }
     if (to) { query += ' AND created_at <= ?'; params.push(to); }
 
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    query += ` ORDER BY
+      CASE status
+        WHEN 'active' THEN 1
+        WHEN 'investigating' THEN 2
+        WHEN 'resolved' THEN 3
+        WHEN 'false_positive' THEN 4
+        ELSE 5
+      END ASC,
+      created_at DESC
+    LIMIT ? OFFSET ?`;
     params.push(parseInt(limit), parseInt(offset));
 
     const alerts = db.prepare(query).all(...params);

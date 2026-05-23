@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import StatCard from '../components/common/StatCard';
 import AlertCard from '../components/alerts/AlertCard';
 import { SeverityTimelineChart, AttackTypeChart, SeverityPieChart, AppDistributionChart } from '../components/charts/Charts';
-import { dashboardApi, insightsApi } from '../api/client';
+import { dashboardApi, insightsApi, applicationsApi } from '../api/client';
 import { useAlerts } from '../context/AlertContext';
 import { AlertTriangle, Shield, Globe, Brain, RefreshCw, Activity, TrendingUp, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -14,6 +14,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [recentAlerts, setRecentAlerts] = useState([]);
   const [trends, setTrends] = useState(null);
+  const [apps, setApps] = useState([]);
+  const [appFilter, setAppFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -36,6 +38,17 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Load apps for filter
+  useEffect(() => {
+    applicationsApi.getAll().then(res => setApps(res.applications || [])).catch(() => {});
+  }, []);
+
+  // Auto-refresh every 30s so stats update after resolving alerts
+  useEffect(() => {
+    const interval = setInterval(() => fetchData(), 30000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
 
   // Merge live alerts into recent alerts
   const displayAlerts = [...liveAlerts.slice(0, 5), ...recentAlerts].slice(0, 10)
@@ -131,31 +144,56 @@ export default function Dashboard() {
             <div className="pulse-dot red" style={{ display: 'inline-block', marginRight: 4 }} />
             Live Threat Feed
           </span>
-          <button className="btn btn-secondary btn-sm" onClick={() => navigate('/alerts')}>
-            View All →
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {apps.length > 0 && (
+              <select
+                className="input"
+                style={{ width: 'auto', padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}
+                value={appFilter}
+                onChange={e => setAppFilter(e.target.value)}
+              >
+                <option value="">All Apps</option>
+                {apps.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+              </select>
+            )}
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/alerts')}>
+              View All →
+            </button>
+          </div>
         </div>
 
-        {displayAlerts.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">🛡️</div>
-            <h3>No threats detected</h3>
-            <p>Your systems are clean. Alerts will appear here in real-time when threats are detected.</p>
-          </div>
-        ) : (
-          <div>
-            {displayAlerts.map(alert => (
-              <AlertCard
-                key={alert.id}
-                alert={alert}
-                onStatusChange={(id, status) => {
-                  setRecentAlerts(prev => prev.map(a => a.id === id ? { ...a, status } : a));
-                }}
-                onViewInsight={(alert) => navigate(`/insights?alertId=${alert.id}`)}
-              />
-            ))}
-          </div>
-        )}
+        {(() => {
+          // Filter by app if selected, then sort resolved to bottom
+          const filtered = displayAlerts
+            .filter(a => !appFilter || a.source_app === appFilter)
+            .sort((a, b) => {
+              const order = { active: 0, investigating: 1, resolved: 2, false_positive: 3 };
+              return (order[a.status] ?? 0) - (order[b.status] ?? 0);
+            });
+
+          return filtered.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">🛡️</div>
+              <h3>{appFilter ? `No threats from ${appFilter}` : 'No threats detected'}</h3>
+              <p>Your systems are clean. Alerts will appear here in real-time when threats are detected.</p>
+            </div>
+          ) : (
+            <div>
+              {filtered.map(alert => (
+                <AlertCard
+                  key={alert.id}
+                  alert={alert}
+                  onStatusChange={(id, status) => {
+                    setRecentAlerts(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+                    // Refresh stats after a short delay so backend has time to update
+                    setTimeout(() => fetchData(), 800);
+                  }}
+                  onViewInsight={(alert) => navigate(`/insights?alertId=${alert.id}`)}
+                />
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

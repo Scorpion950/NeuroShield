@@ -25,7 +25,9 @@ export default function AlertCard({ alert, onStatusChange, onViewInsight, select
   const sev = SEVERITY_CONFIG[alert.severity] || SEVERITY_CONFIG.medium;
   const statusCfg = STATUS_CONFIG[alert.status] || STATUS_CONFIG.active;
   const StatusIcon = statusCfg.icon;
-  const timeAgo = alert.created_at ? formatDistanceToNow(new Date(alert.created_at), { addSuffix: true }) : '';
+  // SQLite CURRENT_TIMESTAMP is UTC but has no 'Z' suffix — add it to get correct relative time
+  const parseUTC = (ts) => ts ? new Date(ts.endsWith('Z') ? ts : ts + 'Z') : null;
+  const timeAgo = alert.created_at ? formatDistanceToNow(parseUTC(alert.created_at), { addSuffix: true }) : '';
 
   const handleStatusChange = async (newStatus) => {
     setUpdating(true);
@@ -82,9 +84,10 @@ export default function AlertCard({ alert, onStatusChange, onViewInsight, select
               AI Analysis
             </button>
             {onViewInsight && (
-              <button className="btn btn-secondary btn-sm" onClick={() => onViewInsight(alert)}>
+              <button className="btn btn-secondary btn-sm" onClick={() => onViewInsight(alert)}
+                style={{ color: 'var(--accent-purple)', borderColor: 'rgba(139,92,246,0.2)' }}>
                 <ExternalLink size={13} />
-                Investigate
+                AI Insights
               </button>
             )}
             {alert.status !== 'resolved' && (
@@ -94,12 +97,13 @@ export default function AlertCard({ alert, onStatusChange, onViewInsight, select
               </button>
             )}
             {alert.status === 'active' && (
-              <button className="btn btn-secondary btn-sm" onClick={() => handleStatusChange('investigating')} disabled={updating}>
+              <button className="btn btn-secondary btn-sm" onClick={() => handleStatusChange('investigating')} disabled={updating}
+                style={{ color: 'var(--accent-blue)' }}>
                 <Eye size={13} />
                 Investigate
               </button>
             )}
-            {alert.status !== 'false_positive' && (
+            {alert.status !== 'false_positive' && alert.status !== 'resolved' && (
               <button className="btn btn-secondary btn-sm" onClick={() => handleStatusChange('false_positive')} disabled={updating}
                 style={{ color: 'var(--accent-purple)', borderColor: 'rgba(139,92,246,0.3)' }}>
                 <Shield size={13} />

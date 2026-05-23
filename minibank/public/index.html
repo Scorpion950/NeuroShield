@@ -3,104 +3,349 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MiniBank - Secure Banking Portal</title>
+  <title>MiniBank — Secure Digital Banking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #e2e8f0; }
-    .bank-logo { font-size: 2.5rem; font-weight: 800; color: #3b82f6; margin-bottom: 0.5rem; letter-spacing: -1px; }
-    .bank-logo span { color: #10b981; }
-    .subtitle { color: #94a3b8; margin-bottom: 2rem; font-size: 0.9rem; }
-    .card { background: rgba(30,41,59,0.9); border: 1px solid rgba(59,130,246,0.2); border-radius: 16px; padding: 2.5rem; width: 400px; max-width: 95vw; backdrop-filter: blur(20px); }
-    h2 { font-size: 1.3rem; margin-bottom: 1.5rem; color: #f1f5f9; }
-    .form-group { margin-bottom: 1.2rem; }
-    label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.4rem; }
-    input { width: 100%; padding: 0.75rem 1rem; background: rgba(15,23,42,0.8); border: 1px solid rgba(59,130,246,0.3); border-radius: 8px; color: #e2e8f0; font-size: 0.95rem; outline: none; transition: border-color 0.2s; }
-    input:focus { border-color: #3b82f6; }
-    .btn { width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; border-radius: 8px; color: white; font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
-    .btn:hover { opacity: 0.9; }
-    .info { margin-top: 1.5rem; padding: 1rem; background: rgba(59,130,246,0.1); border-radius: 8px; font-size: 0.8rem; color: #94a3b8; }
-    .info strong { color: #60a5fa; }
-    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.7rem; font-weight: 600; background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.3); margin-bottom: 1rem; }
-    .error { color: #f87171; font-size: 0.85rem; margin-top: 0.5rem; display: none; }
-    .success { color: #34d399; font-size: 0.85rem; margin-top: 0.5rem; display: none; }
-    .sim-section { margin-top: 2rem; padding-top: 2rem; border-top: 1px solid rgba(59,130,246,0.1); }
-    .sim-title { font-size: 0.85rem; color: #94a3b8; margin-bottom: 1rem; }
-    .sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-    .sim-btn { padding: 0.5rem; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; color: #f87171; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
-    .sim-btn:hover { background: rgba(239,68,68,0.2); }
-    .sim-status { margin-top: 0.5rem; font-size: 0.75rem; color: #fbbf24; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #060b14;
+      --bg2: #0d1526;
+      --card: rgba(13, 21, 38, 0.9);
+      --border: rgba(56, 100, 180, 0.2);
+      --blue: #3b82f6;
+      --green: #10b981;
+      --red: #ef4444;
+      --amber: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --dim: #94a3b8;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -20%;
+      left: -10%;
+      width: 50%;
+      height: 60%;
+      background: radial-gradient(ellipse, rgba(59,130,246,0.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 40%;
+      height: 50%;
+      background: radial-gradient(ellipse, rgba(16,185,129,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Header */
+    .header { text-align: center; margin-bottom: 2rem; }
+    .logo {
+      display: inline-flex; align-items: center; gap: 0.625rem;
+      margin-bottom: 0.5rem;
+    }
+    .logo-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, #3b82f6, #10b981);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+      box-shadow: 0 0 24px rgba(59,130,246,0.3);
+    }
+    .logo-text { font-size: 1.75rem; font-weight: 800; color: #f8fafc; letter-spacing: -0.04em; }
+    .logo-text span { color: var(--green); }
+    .header-sub { font-size: 0.875rem; color: var(--muted); letter-spacing: 0.01em; }
+
+    /* Main card */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2rem;
+      width: 440px;
+      max-width: 100%;
+      backdrop-filter: blur(24px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Monitored badge */
+    .monitored-badge {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.3rem 0.75rem; border-radius: 20px;
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+      color: #f87171; font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 0.04em; margin-bottom: 1.25rem;
+    }
+    .pulse { width: 7px; height: 7px; border-radius: 50%; background: #ef4444; animation: blink 1.4s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    h2 { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; margin-bottom: 1.5rem; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 0.25rem; margin-bottom: 1.5rem; background: rgba(15,23,42,0.5); border-radius: 10px; padding: 0.25rem; }
+    .tab { flex: 1; padding: 0.5rem; border: none; background: transparent; color: var(--muted); font-size: 0.85rem; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+    .tab.active { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.25); }
+
+    /* Form */
+    .form-group { margin-bottom: 1rem; }
+    label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--dim); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .input-wrap { position: relative; }
+    .input-icon { position: absolute; left: 0.875rem; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 1rem; pointer-events: none; }
+    input {
+      width: 100%; padding: 0.8rem 1rem 0.8rem 2.5rem;
+      background: rgba(15,23,42,0.7); border: 1px solid rgba(56,100,180,0.2);
+      border-radius: 10px; color: var(--text); font-size: 0.9rem;
+      outline: none; transition: all 0.2s; font-family: inherit;
+    }
+    input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    input::placeholder { color: var(--muted); }
+
+    .btn-primary {
+      width: 100%; padding: 0.9rem;
+      background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+      border: none; border-radius: 10px; color: white;
+      font-size: 0.95rem; font-weight: 700; cursor: pointer;
+      transition: all 0.2s; letter-spacing: 0.01em; font-family: inherit;
+      box-shadow: 0 4px 16px rgba(59,130,246,0.3);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(59,130,246,0.4); }
+    .btn-primary:active { transform: translateY(0); }
+
+    /* Messages */
+    .msg { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-top: 0.875rem; display: none; }
+    .msg.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #f87171; }
+    .msg.success { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); color: #34d399; }
+    .msg.show { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Demo accounts */
+    .demo-accounts {
+      margin-top: 1.25rem; padding: 0.875rem 1rem;
+      background: rgba(59,130,246,0.05); border: 1px solid rgba(59,130,246,0.12); border-radius: 10px;
+    }
+    .demo-title { font-size: 0.72rem; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
+    .demo-row { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--dim); padding: 0.2rem 0; }
+    .demo-row code { font-family: monospace; color: #94a3b8; font-size: 0.78rem; }
+
+    /* Divider */
+    .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+
+    /* Attack simulations */
+    .sim-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+    .sim-title { font-size: 0.78rem; font-weight: 700; color: var(--amber); text-transform: uppercase; letter-spacing: 0.08em; }
+    .sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .sim-btn {
+      padding: 0.6rem 0.75rem;
+      background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.18);
+      border-radius: 8px; color: #f87171; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; text-align: left; font-family: inherit;
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .sim-btn:hover { background: rgba(239,68,68,0.14); border-color: rgba(239,68,68,0.3); transform: translateY(-1px); }
+    .sim-btn-all {
+      width: 100%; padding: 0.7rem;
+      background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 8px; color: #fbbf24; font-size: 0.85rem; font-weight: 700;
+      cursor: pointer; transition: all 0.2s; font-family: inherit;
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+    }
+    .sim-btn-all:hover { background: rgba(245,158,11,0.13); }
+    .sim-status {
+      margin-top: 0.75rem; font-size: 0.8rem; color: var(--amber);
+      padding: 0.5rem 0.75rem; background: rgba(245,158,11,0.07);
+      border-radius: 8px; display: none;
+    }
+    .sim-status.show { display: block; animation: fadeIn 0.2s ease; }
+
+    /* Footer */
+    .footer { margin-top: 1.5rem; text-align: center; font-size: 0.75rem; color: var(--muted); }
+    .footer a { color: #60a5fa; text-decoration: none; }
   </style>
 </head>
 <body>
-  <div class="bank-logo">Mini<span>Bank</span></div>
-  <p class="subtitle">Secure Digital Banking — NeuroShield Demo Environment</p>
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🏦</div>
+      <div class="logo-text">Mini<span>Bank</span></div>
+    </div>
+    <p class="header-sub">Secure Digital Banking — NeuroShield Demo Environment</p>
+  </div>
 
   <div class="card">
-    <div class="badge">🔴 Monitored by NeuroShield</div>
-    <h2>🏦 Customer Login</h2>
-    <div class="form-group">
-      <label>Username</label>
-      <input type="text" id="username" placeholder="Enter username" />
-    </div>
-    <div class="form-group">
-      <label>Password</label>
-      <input type="password" id="password" placeholder="Enter password" />
-    </div>
-    <button class="btn" onclick="login()">Sign In Securely</button>
-    <div class="error" id="error-msg"></div>
-    <div class="success" id="success-msg"></div>
-
-    <div class="info">
-      <strong>Demo Accounts:</strong><br/>
-      john.doe / password123 | jane.smith / securepass<br/>
-      admin / admin@minibank
+    <div class="monitored-badge">
+      <div class="pulse"></div>
+      MONITORED BY NEUROSHIELD
     </div>
 
-    <div class="sim-section">
-      <div class="sim-title">⚠️ Attack Simulation (Demo)</div>
-      <div class="sim-grid">
-        <button class="sim-btn" onclick="simulate('brute-force')">💥 Brute Force</button>
-        <button class="sim-btn" onclick="simulate('sql-injection')">💉 SQL Injection</button>
-        <button class="sim-btn" onclick="simulate('suspicious-login')">🌍 Suspicious Login</button>
-        <button class="sim-btn" onclick="simulate('api-abuse')">🔄 API Abuse</button>
-        <button class="sim-btn" onclick="simulate('unauthorized-admin')">🚫 Unauth Admin</button>
-        <button class="sim-btn" onclick="simulate('privilege-escalation')">⬆️ Priv Escalation</button>
-        <button class="sim-btn" onclick="simulate('abnormal-behavior')">🤖 Abnormal Behavior</button>
-        <button class="sim-btn" onclick="simulate('credential-stuffing')">📋 Cred Stuffing</button>
-      </div>
-      <div style="margin-top:0.5rem">
-        <button class="sim-btn" style="width:100%;background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3);color:#fbbf24" onclick="simulate('all')">🚨 Run ALL Attack Scenarios</button>
-      </div>
-      <div class="sim-status" id="sim-status"></div>
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('login')">Customer Login</button>
+      <button class="tab" onclick="switchTab('register')">Register</button>
     </div>
+
+    <!-- Login form -->
+    <div id="tab-login">
+      <h2>Welcome back 👋</h2>
+      <div class="form-group">
+        <label>Username</label>
+        <div class="input-wrap">
+          <span class="input-icon">👤</span>
+          <input type="text" id="username" placeholder="Enter your username" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <div class="input-wrap">
+          <span class="input-icon">🔑</span>
+          <input type="password" id="password" placeholder="Enter your password" />
+        </div>
+      </div>
+      <button class="btn-primary" onclick="login()">Sign In Securely →</button>
+      <div class="msg error" id="error-msg"></div>
+      <div class="msg success" id="success-msg"></div>
+
+      <div class="demo-accounts">
+        <div class="demo-title">Demo Accounts</div>
+        <div class="demo-row"><span>Customer</span><code>john.doe / password123</code></div>
+        <div class="demo-row"><span>Customer</span><code>jane.smith / securepass</code></div>
+        <div class="demo-row"><span>Admin</span><code>admin / admin@minibank</code></div>
+      </div>
+    </div>
+
+    <!-- Register form (placeholder) -->
+    <div id="tab-register" style="display:none">
+      <h2>Create Account</h2>
+      <div class="form-group">
+        <label>Full Name</label>
+        <div class="input-wrap">
+          <span class="input-icon">👤</span>
+          <input type="text" placeholder="John Doe" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Username</label>
+        <div class="input-wrap">
+          <span class="input-icon">🆔</span>
+          <input type="text" placeholder="Choose a username" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <div class="input-wrap">
+          <span class="input-icon">🔑</span>
+          <input type="password" placeholder="Create a strong password" />
+        </div>
+      </div>
+      <button class="btn-primary" onclick="showMsg('reg-msg', 'Registration simulated — this is a demo environment.', 'success')">Create Account →</button>
+      <div class="msg success" id="reg-msg"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Attack Simulations -->
+    <div class="sim-header">
+      <span style="font-size:1rem">⚠️</span>
+      <span class="sim-title">Attack Simulation Panel</span>
+    </div>
+    <div class="sim-grid">
+      <button class="sim-btn" onclick="simulate('brute-force')">💥 Brute Force</button>
+      <button class="sim-btn" onclick="simulate('sql-injection')">💉 SQL Injection</button>
+      <button class="sim-btn" onclick="simulate('suspicious-login')">🌍 Suspicious Login</button>
+      <button class="sim-btn" onclick="simulate('api-abuse')">🔄 API Abuse</button>
+      <button class="sim-btn" onclick="simulate('unauthorized-admin')">🚫 Unauth Admin</button>
+      <button class="sim-btn" onclick="simulate('privilege-escalation')">⬆️ Priv Escalation</button>
+      <button class="sim-btn" onclick="simulate('abnormal-behavior')">🤖 Abnormal Behavior</button>
+      <button class="sim-btn" onclick="simulate('credential-stuffing')">📋 Cred Stuffing</button>
+    </div>
+    <button class="sim-btn-all" onclick="simulate('all')">🚨 Run ALL Attack Scenarios</button>
+    <div class="sim-status" id="sim-status"></div>
+  </div>
+
+  <div class="footer">
+    Protected by <a href="http://localhost:5173" target="_blank">NeuroShield AI</a> · Demo Environment Only
   </div>
 
   <script>
-    const BASE = '';
-    async function login() {
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      const errEl = document.getElementById('error-msg');
-      const sucEl = document.getElementById('success-msg');
-      errEl.style.display = 'none'; sucEl.style.display = 'none';
-      try {
-        const res = await fetch(`${BASE}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
-        const data = await res.json();
-        if (data.success) { sucEl.textContent = `Welcome back, ${username}! (${data.user.role})`; sucEl.style.display = 'block'; }
-        else { errEl.textContent = data.message; errEl.style.display = 'block'; }
-      } catch(e) { errEl.textContent = 'Connection error.'; errEl.style.display = 'block'; }
+    function switchTab(tab) {
+      document.getElementById('tab-login').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('tab-register').style.display = tab === 'register' ? 'block' : 'none';
+      document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (i === 0) === (tab === 'login')));
     }
+
+    function showMsg(id, text, type) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      el.className = `msg ${type} show`;
+      setTimeout(() => el.classList.remove('show'), 5000);
+    }
+
+    async function login() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      document.getElementById('error-msg').classList.remove('show');
+      document.getElementById('success-msg').classList.remove('show');
+      if (!username || !password) { showMsg('error-msg', 'Please enter username and password.', 'error'); return; }
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showMsg('success-msg', `✅ Welcome back, ${username}! (${data.user?.role || 'customer'})`, 'success');
+        } else {
+          showMsg('error-msg', data.message || 'Invalid credentials.', 'error');
+        }
+      } catch(e) {
+        showMsg('error-msg', '❌ Connection error. Is MiniBank running?', 'error');
+      }
+    }
+
     async function simulate(type) {
       const statusEl = document.getElementById('sim-status');
-      statusEl.textContent = `🔄 Running ${type} simulation...`;
+      statusEl.textContent = `🔄 Running ${type.replace(/-/g,' ')} simulation…`;
+      statusEl.className = 'sim-status show';
       try {
-        const res = await fetch(`${BASE}/simulate/${type}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ attempts: 10, count: 8, requests: 65 }) });
+        const res = await fetch(`/simulate/${type}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ attempts: 10, count: 8, requests: 65 })
+        });
         const data = await res.json();
         statusEl.textContent = `✅ ${data.message}`;
-        setTimeout(() => { statusEl.textContent = ''; }, 5000);
-      } catch(e) { statusEl.textContent = `❌ Simulation failed: ${e.message}`; }
+        setTimeout(() => statusEl.classList.remove('show'), 6000);
+      } catch(e) {
+        statusEl.textContent = `❌ Simulation failed: ${e.message}`;
+      }
     }
-    document.getElementById('password').addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') login();
+    });
   </script>
 </body>
 </html>

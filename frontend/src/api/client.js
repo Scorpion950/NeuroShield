@@ -49,11 +49,13 @@ export const alertsApi = {
   getAlert: (id) => api.get(`/alerts/${id}`),
   updateStatus: (id, status) => api.patch(`/alerts/${id}/status`, { status }),
   bulkAction: (data) => api.post('/alerts/bulk-action', data),
-  deleteAlert: (id) => api.delete(`/alerts/${id}`)
+  deleteAlert: (id) => api.delete(`/alerts/${id}`),
+  getIncidents: (params) => api.get('/incidents', { params })
 };
 
 // Applications
 export const applicationsApi = {
+  getAll: () => api.get('/applications'),
   getApplications: () => api.get('/applications'),
   getApplication: (id) => api.get(`/applications/${id}`),
   createApplication: (data) => api.post('/applications', data),
@@ -63,6 +65,7 @@ export const applicationsApi = {
 
 // API Keys
 export const apiKeysApi = {
+  getAll: () => api.get('/apikeys'),
   getKeys: () => api.get('/apikeys'),
   createKey: (data) => api.post('/apikeys', data),
   revokeKey: (id) => api.patch(`/apikeys/${id}/revoke`),

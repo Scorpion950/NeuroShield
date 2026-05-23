@@ -7,17 +7,26 @@ const router = express.Router();
 router.get('/stats', authMiddleware, (req, res) => {
   try {
     const db = getDb();
-    const today = new Date().toISOString().split('T')[0];
-    const todayStart = today + 'T00:00:00.000Z';
+    // Use a 24-hour rolling window anchored to local midnight
+    const now = new Date();
+    // IST = UTC+5:30 = 330 minutes offset. Use 5.5 hr offset to start of today
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    // Store as ISO string but also compare against both UTC and local
+    const todayStartISO = todayStart.toISOString();
+    // Also try 24h ago as fallback so nothing is missed
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Use the earlier of the two (midnight or 24h ago) to be inclusive
+    const cutoff = todayStartISO < since24h ? todayStartISO : since24h;
 
-    const totalToday = db.prepare('SELECT COUNT(*) as count FROM alerts WHERE created_at >= ?').get(todayStart);
-    const criticalCount = db.prepare("SELECT COUNT(*) as count FROM alerts WHERE severity = 'critical' AND created_at >= ?").get(todayStart);
+    const totalToday = db.prepare('SELECT COUNT(*) as count FROM alerts WHERE created_at >= ?').get(cutoff);
+    const criticalCount = db.prepare("SELECT COUNT(*) as count FROM alerts WHERE severity = 'critical' AND created_at >= ?").get(cutoff);
     const appsCount = db.prepare("SELECT COUNT(*) as count FROM applications WHERE status = 'active'").get();
-    const aiActions = db.prepare("SELECT COUNT(*) as count FROM alerts WHERE ai_explanation IS NOT NULL AND created_at >= ?").get(todayStart);
+    const aiActions = db.prepare("SELECT COUNT(*) as count FROM alerts WHERE ai_explanation IS NOT NULL AND created_at >= ?").get(cutoff);
     const activeAlerts = db.prepare("SELECT COUNT(*) as count FROM alerts WHERE status = 'active'").get();
-    const resolvedToday = db.prepare("SELECT COUNT(*) as count FROM alerts WHERE status = 'resolved' AND created_at >= ?").get(todayStart);
-    const falsePositives = db.prepare("SELECT COUNT(*) as count FROM alerts WHERE is_false_positive = 1 AND created_at >= ?").get(todayStart);
-    const logsProcessed = db.prepare('SELECT COUNT(*) as count FROM logs WHERE created_at >= ?').get(todayStart);
+    const resolvedToday = db.prepare("SELECT COUNT(*) as count FROM alerts WHERE status = 'resolved' AND updated_at >= ?").get(cutoff);
+    const falsePositives = db.prepare("SELECT COUNT(*) as count FROM alerts WHERE is_false_positive = 1 AND created_at >= ?").get(cutoff);
+    const logsProcessed = db.prepare('SELECT COUNT(*) as count FROM logs WHERE created_at >= ?').get(cutoff);
 
     res.json({
       success: true,

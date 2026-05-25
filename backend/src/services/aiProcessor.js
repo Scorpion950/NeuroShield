@@ -262,7 +262,7 @@ async function generateChatResponse(userMessage, conversationHistory = [], dbCon
   if (apiKey && apiKey.trim().length > 0) {
     try {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
       const systemContext = `You are the NeuroShield AI Security Assistant — an expert cybersecurity analyst embedded in the NeuroShield threat detection platform. Answer concisely and helpfully. Use markdown formatting (bold, bullet lists) in responses.
 

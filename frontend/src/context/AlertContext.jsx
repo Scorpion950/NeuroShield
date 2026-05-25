@@ -7,27 +7,29 @@ export function AlertProvider({ children }) {
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [wsConnected, setWsConnected] = useState(false);
   const [stats, setStats] = useState({ total: 0, critical: 0 });
-  const wsRef = useRef(null);
+  const esRef = useRef(null);
   const reconnectRef = useRef(null);
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (esRef.current && esRef.current.readyState !== EventSource.CLOSED) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // In dev Vite runs on 5173/5174 but WS backend is on 5000
-    const backendHost = window.location.hostname + ':5000';
-    const ws = new WebSocket(`${protocol}//${backendHost}/ws`);
-    wsRef.current = ws;
+    // In dev Vite proxies /api to backend; in production it's same-origin
+    const sseUrl = '/api/events/stream';
+    const es = new EventSource(sseUrl);
+    esRef.current = es;
 
-    ws.onopen = () => {
+    es.onopen = () => {
       setWsConnected(true);
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
     };
 
-    ws.onmessage = (event) => {
+    es.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        if (msg.type === 'new_alert') {
+
+        if (msg.type === 'connected') {
+          setWsConnected(true);
+        } else if (msg.type === 'new_alert') {
           const alert = msg.data;
           setLiveAlerts(prev => [alert, ...prev].slice(0, 100));
           setStats(prev => ({
@@ -35,39 +37,52 @@ export function AlertProvider({ children }) {
             critical: prev.critical + (alert.severity === 'critical' ? 1 : 0)
           }));
 
-          // Toast notification
           const severityEmoji = { critical: '🔴', high: '🟠', medium: '🟡', low: '🟢' };
-          const toastFn = alert.severity === 'critical' ? toast.error :
-                          alert.severity === 'high' ? toast.error : toast;
+          const toastFn = (alert.severity === 'critical' || alert.severity === 'high')
+            ? toast.error : toast;
           toastFn(`${severityEmoji[alert.severity] || '⚠️'} ${alert.title}`, {
             duration: alert.severity === 'critical' ? 8000 : 4000,
             style: {
               background: '#0f1c30', color: '#e2e8f0',
-              border: `1px solid ${alert.severity === 'critical' ? '#ef4444' : alert.severity === 'high' ? '#f97316' : '#f59e0b'}`,
+              border: `1px solid ${
+                alert.severity === 'critical' ? '#ef4444' :
+                alert.severity === 'high' ? '#f97316' : '#f59e0b'
+              }`,
               fontSize: '0.85rem'
             }
           });
         } else if (msg.type === 'stats_update') {
-          // Handle stats updates
-        } else if (msg.type === 'health_update') {
-          // Handle health updates
+          // handle stats
         }
       } catch (e) {}
     };
 
-    ws.onclose = () => {
+    es.onerror = () => {
       setWsConnected(false);
-      reconnectRef.current = setTimeout(connect, 3000);
+      es.close();
+      esRef.current = null;
+      reconnectRef.current = setTimeout(connect, 5000);
     };
-
-    ws.onerror = () => { ws.close(); };
   }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('ns_token');
-    if (token) connect();
+    if (token) {
+      connect();
+      // Fetch initial active alerts so the notification panel isn't empty on reload
+      fetch('/api/alerts?limit=10&status=active', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.alerts) {
+          setLiveAlerts(data.alerts);
+        }
+      })
+      .catch(() => {});
+    }
     return () => {
-      if (wsRef.current) wsRef.current.close();
+      if (esRef.current) esRef.current.close();
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
     };
   }, [connect]);

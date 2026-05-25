@@ -304,7 +304,7 @@ Use this live data to give accurate, context-aware answers. When asked about spe
   }
 
   return {
-    reply: `I'm the NeuroShield Security Assistant. You currently have **${ctx.totalAlerts}** alerts in the last 24 hours with a risk level of **${ctx.riskLevel}**.\n\nI can answer questions about your top threats, risk levels, remediation steps, and suspicious IPs. Try asking:\n• "What are my top threats today?"\n• "How do I mitigate brute force attacks?"\n• "Which IPs should I block?"`,
+    reply: `I am the NeuroShield AI. I heard you say: "${userMessage}".\n\n*Note: My advanced Gemini connection is currently offline (invalid/missing API key), so I am operating in **rules-based mode**.*\n\nI can still help you with live data! Try asking:\n• 📊 "What are my top threats?"\n• 🔴 "What is the current risk level?"\n• 🚫 "Which IPs should I block?"\n• 🛡️ "How to mitigate brute force?"\n\n*(To enable full conversational AI, please add a valid \`GEMINI_API_KEY\` in your backend \`.env\` file.)*`,
     source: 'rules'
   };
 }

@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useAlerts } from '../../context/AlertContext';
 import {
   LayoutDashboard, Bell, BarChart3, Globe, Brain,
-  History, Key, Settings, Shield, ChevronLeft, ChevronRight,
+  History, Key, Settings, Shield, ChevronLeft, ChevronRight, Ban, Landmark,
 } from 'lucide-react';
 
 const NAV_GROUPS = [
@@ -15,12 +15,14 @@ const NAV_GROUPS = [
       { label: 'Threat Analytics', icon: BarChart3,       path: '/analytics' },
       { label: 'Applications',     icon: Globe,           path: '/applications' },
       { label: 'AI Insights',      icon: Brain,           path: '/insights' },
+      { label: 'MiniBank Sim',     icon: Landmark,        path: '/minibank' },
     ],
   },
   {
     label: 'Management',
     items: [
       { label: 'Incident History', icon: History,  path: '/incidents' },
+      { label: 'Blocked IPs',     icon: Ban,      path: '/blocked-ips' },
       { label: 'API Keys',         icon: Key,      path: '/apikeys' },
       { label: 'Settings',         icon: Settings, path: '/settings' },
     ],

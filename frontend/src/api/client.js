@@ -94,4 +94,12 @@ export const incidentsApi = {
   deleteIncident: (id) => api.delete(`/incidents/${id}`)
 };
 
+// Blocked IPs
+export const blockedIpsApi = {
+  getAll: (params) => api.get('/blocked-ips', { params }),
+  block: (data) => api.post('/blocked-ips', data),
+  unblock: (id) => api.delete(`/blocked-ips/${id}`),
+  check: (ip) => api.get(`/blocked-ips/check/${ip}`)
+};
+
 export default api;

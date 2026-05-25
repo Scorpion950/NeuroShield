@@ -1,10 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const http = require('http');
-const WebSocket = require('ws');
+const path = require('path');
 const { initializeDatabase } = require('./config/database');
-const { setWsClients } = require('./services/threatDetection');
+const { addSseClient, removeSseClient } = require('./services/threatDetection');
 const config = require('./config/config');
 
 // Routes
@@ -16,24 +15,29 @@ const insightsRoutes = require('./routes/insights');
 const dashboardRoutes = require('./routes/dashboard');
 const ingestRoutes = require('./routes/ingest');
 const incidentsRoutes = require('./routes/incidents');
-
-// Initialize DB
-initializeDatabase();
+const blockedIpsRoutes = require('./routes/blockedIps');
+const minibankRoutes = require('./routes/minibank');
 
 const app = express();
 
-// Middleware
-app.use(cors({ origin: config.CORS_ORIGINS, credentials: true }));
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5001',
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [])
+];
+
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging
-app.use((req, res, next) => {
-  if (process.env.NODE_ENV !== 'production') {
+// Request logging (dev only)
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  }
-  next();
-});
+    next();
+  });
+}
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -44,11 +48,47 @@ app.use('/api/insights', insightsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/ingest', ingestRoutes);
 app.use('/api/incidents', incidentsRoutes);
+app.use('/api/blocked-ips', blockedIpsRoutes);
+app.use('/api/minibank', minibankRoutes);
+
+// SSE endpoint - replaces WebSocket for Vercel compatibility
+app.get('/api/events/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  // Send connected event
+  res.write(`data: ${JSON.stringify({ type: 'connected', data: { message: 'Connected to NeuroShield Live Feed', timestamp: new Date().toISOString() } })}\n\n`);
+
+  addSseClient(res);
+  console.log('[SSE] Client connected');
+
+  // Heartbeat every 25s to prevent proxy timeouts
+  const heartbeat = setInterval(() => {
+    try { res.write(': heartbeat\n\n'); } catch (e) { clearInterval(heartbeat); }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    removeSseClient(res);
+  });
+});
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'operational', platform: 'NeuroShield', version: '1.0.0', timestamp: new Date().toISOString() });
+  res.json({ status: 'operational', platform: 'NeuroShield', version: '2.0.0', timestamp: new Date().toISOString() });
 });
+
+// Serve frontend in production
+if (process.env.NODE_ENV === 'production') {
+  const frontendDist = path.join(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 // 404 handler
 app.use((req, res) => {
@@ -61,62 +101,31 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: 'Internal server error.' });
 });
 
-// Create HTTP server
-const server = http.createServer(app);
+const PORT = config.PORT || 5000;
 
-// WebSocket Server
-const wss = new WebSocket.Server({ server, path: '/ws' });
-const wsClients = new Set();
+if (process.env.VERCEL) {
+  // Vercel serverless environment
+  initializeDatabase().catch(console.error);
+  module.exports = app;
+} else {
+  // Local development
+  initializeDatabase()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`\n🛡️  NeuroShield Platform running on port ${PORT}`);
+        console.log(`📡 SSE live feed at http://localhost:${PORT}/api/events/stream`);
+        console.log(`🔗 API available at http://localhost:${PORT}/api\n`);
+      });
+    })
+    .catch(err => {
+      console.error('\n❌ [Server] Database connection failed:', err.message);
+      console.error('⚠️  Make sure DATABASE_URL is set in backend/.env');
+      console.error('    Get a free DB at: https://console.neon.tech\n');
+      // Still start server so frontend loads, API calls will fail gracefully
+      app.listen(PORT, () => {
+        console.log(`⚠️  NeuroShield running on port ${PORT} (NO DATABASE — API calls will fail)`);
+      });
+    });
 
-wss.on('connection', (ws, req) => {
-  wsClients.add(ws);
-  console.log(`[WS] Client connected. Total: ${wsClients.size}`);
-
-  // Send welcome message
-  ws.send(JSON.stringify({
-    type: 'connected',
-    data: { message: 'Connected to NeuroShield Real-Time Feed', timestamp: new Date().toISOString() }
-  }));
-
-  ws.on('message', (msg) => {
-    try {
-      const parsed = JSON.parse(msg);
-      if (parsed.type === 'ping') ws.send(JSON.stringify({ type: 'pong' }));
-    } catch (e) {}
-  });
-
-  ws.on('close', () => {
-    wsClients.delete(ws);
-    console.log(`[WS] Client disconnected. Total: ${wsClients.size}`);
-  });
-
-  ws.on('error', () => wsClients.delete(ws));
-});
-
-// Pass ws clients to threat detection service
-setWsClients(wsClients);
-
-// System health broadcast every 30s
-setInterval(() => {
-  const healthMsg = JSON.stringify({
-    type: 'health_update',
-    data: {
-      uptime: process.uptime(),
-      memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-      connected_clients: wsClients.size,
-      timestamp: new Date().toISOString()
-    }
-  });
-  wsClients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) client.send(healthMsg);
-  });
-}, 30000);
-
-const PORT = config.PORT;
-server.listen(PORT, () => {
-  console.log(`\n🛡️  NeuroShield Platform running on port ${PORT}`);
-  console.log(`📡 WebSocket server ready at ws://localhost:${PORT}/ws`);
-  console.log(`🔗 API available at http://localhost:${PORT}/api\n`);
-});
-
-module.exports = { app, server };
+  module.exports = app;
+}

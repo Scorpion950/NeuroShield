@@ -1,33 +1,23 @@
 const express = require('express');
-const { getDb } = require('../config/database');
+const { query, queryOne } = require('../config/database');
 const { authMiddleware } = require('../middleware/auth');
 const { generateDailySummary, generateAIExplanation, generateChatResponse } = require('../services/aiProcessor');
 const router = express.Router();
 
-
 // GET /api/insights/summary
-router.get('/summary', authMiddleware, (req, res) => {
+router.get('/summary', authMiddleware, async (req, res) => {
   try {
-    const db = getDb();
-    // Use 24h rolling window to handle IST/UTC offset (IST = UTC+5:30)
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    const alerts = db.prepare(`
-      SELECT * FROM alerts WHERE created_at >= ? ORDER BY created_at DESC
-    `).all(cutoff);
+    const [alerts, topThreats, affectedApps] = await Promise.all([
+      query('SELECT * FROM alerts WHERE created_at >= $1 ORDER BY created_at DESC', [cutoff]),
+      query(`SELECT attack_type, COUNT(*) as count, MAX(severity) as max_severity
+             FROM alerts WHERE created_at >= $1 GROUP BY attack_type ORDER BY count DESC LIMIT 5`, [cutoff]),
+      query(`SELECT source_app, COUNT(*) as alert_count
+             FROM alerts WHERE created_at >= $1 GROUP BY source_app ORDER BY alert_count DESC`, [cutoff]),
+    ]);
 
     const summary = generateDailySummary(alerts);
-    const topThreats = db.prepare(`
-      SELECT attack_type, COUNT(*) as count, MAX(severity) as max_severity
-      FROM alerts WHERE created_at >= ? GROUP BY attack_type ORDER BY count DESC LIMIT 5
-    `).all(cutoff);
-
-    const affectedApps = db.prepare(`
-      SELECT source_app, COUNT(*) as alert_count
-      FROM alerts WHERE created_at >= ?
-      GROUP BY source_app ORDER BY alert_count DESC
-    `).all(cutoff);
-
     res.json({ success: true, summary, topThreats, affectedApps, alertCount: alerts.length });
   } catch (err) {
     console.error('[Insights] Summary error:', err);
@@ -36,25 +26,21 @@ router.get('/summary', authMiddleware, (req, res) => {
 });
 
 // GET /api/insights/alert/:id
-router.get('/alert/:id', authMiddleware, (req, res) => {
+router.get('/alert/:id', authMiddleware, async (req, res) => {
   try {
-    const db = getDb();
-    const alert = db.prepare('SELECT * FROM alerts WHERE id = ?').get(req.params.id);
+    const alert = await queryOne('SELECT * FROM alerts WHERE id = $1', [req.params.id]);
     if (!alert) return res.status(404).json({ success: false, message: 'Alert not found.' });
 
     alert.metadata = alert.metadata ? JSON.parse(alert.metadata) : {};
     const aiResult = generateAIExplanation(alert);
 
-    // Get related alerts (same attack type or IP)
-    const related = db.prepare(`
-      SELECT id, title, severity, created_at, attack_type FROM alerts
-      WHERE (attack_type = ? OR ip_address = ?) AND id != ? AND created_at >= datetime('now', '-24 hours')
-      LIMIT 5
-    `).all(alert.attack_type, alert.ip_address, alert.id);
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const related = await query(
+      'SELECT id, title, severity, created_at, attack_type FROM alerts WHERE (attack_type = $1 OR ip_address = $2) AND id != $3 AND created_at >= $4 LIMIT 5',
+      [alert.attack_type, alert.ip_address, alert.id, since24h]
+    );
 
-    // Build timeline
-    const timeline = [];
-    timeline.push({ time: alert.created_at, event: 'Alert created', severity: alert.severity });
+    const timeline = [{ time: alert.created_at, event: 'Alert created', severity: alert.severity }];
     if (alert.updated_at !== alert.created_at) {
       timeline.push({ time: alert.updated_at, event: `Status changed to ${alert.status}` });
     }
@@ -70,37 +56,26 @@ router.get('/alert/:id', authMiddleware, (req, res) => {
 });
 
 // GET /api/insights/trends
-router.get('/trends', authMiddleware, (req, res) => {
+router.get('/trends', authMiddleware, async (req, res) => {
   try {
-    const db = getDb();
     const { hours = 24 } = req.query;
-    const since = `datetime('now', '-${parseInt(hours)} hours')`;
+    const since = new Date(Date.now() - parseInt(hours) * 60 * 60 * 1000).toISOString();
 
-    const hourlyTrends = db.prepare(`
-      SELECT strftime('%Y-%m-%dT%H:00:00', created_at) as hour,
-             COUNT(*) as total,
-             SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as critical,
-             SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) as high,
-             SUM(CASE WHEN severity = 'medium' THEN 1 ELSE 0 END) as medium,
-             SUM(CASE WHEN severity = 'low' THEN 1 ELSE 0 END) as low
-      FROM alerts WHERE created_at >= ${since}
-      GROUP BY hour ORDER BY hour ASC
-    `).all();
-
-    const attackDistribution = db.prepare(`
-      SELECT attack_type, COUNT(*) as count FROM alerts WHERE created_at >= ${since}
-      GROUP BY attack_type ORDER BY count DESC
-    `).all();
-
-    const severityDistribution = db.prepare(`
-      SELECT severity, COUNT(*) as count FROM alerts WHERE created_at >= ${since}
-      GROUP BY severity
-    `).all();
-
-    const appDistribution = db.prepare(`
-      SELECT source_app, COUNT(*) as count FROM alerts WHERE created_at >= ${since}
-      GROUP BY source_app ORDER BY count DESC
-    `).all();
+    const [hourlyTrends, attackDistribution, severityDistribution, appDistribution] = await Promise.all([
+      query(`
+        SELECT date_trunc('hour', created_at) as hour,
+               COUNT(*) as total,
+               SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) as critical,
+               SUM(CASE WHEN severity = 'high' THEN 1 ELSE 0 END) as high,
+               SUM(CASE WHEN severity = 'medium' THEN 1 ELSE 0 END) as medium,
+               SUM(CASE WHEN severity = 'low' THEN 1 ELSE 0 END) as low
+        FROM alerts WHERE created_at >= $1
+        GROUP BY hour ORDER BY hour ASC
+      `, [since]),
+      query('SELECT attack_type, COUNT(*) as count FROM alerts WHERE created_at >= $1 GROUP BY attack_type ORDER BY count DESC', [since]),
+      query('SELECT severity, COUNT(*) as count FROM alerts WHERE created_at >= $1 GROUP BY severity', [since]),
+      query('SELECT source_app, COUNT(*) as count FROM alerts WHERE created_at >= $1 GROUP BY source_app ORDER BY count DESC', [since]),
+    ]);
 
     res.json({ success: true, hourlyTrends, attackDistribution, severityDistribution, appDistribution });
   } catch (err) {
@@ -108,7 +83,6 @@ router.get('/trends', authMiddleware, (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch trends.' });
   }
 });
-
 
 // POST /api/insights/chat
 router.post('/chat', authMiddleware, async (req, res) => {
@@ -118,32 +92,25 @@ router.post('/chat', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Message is required.' });
     }
 
-    const db = getDb();
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    // Gather live DB context
-    const alerts = db.prepare('SELECT * FROM alerts WHERE created_at >= ? ORDER BY created_at DESC').all(cutoff);
+    const [alerts, topThreats, suspiciousIPRows] = await Promise.all([
+      query('SELECT * FROM alerts WHERE created_at >= $1 ORDER BY created_at DESC', [cutoff]),
+      query(`SELECT attack_type, COUNT(*) as count, MAX(severity) as max_severity
+             FROM alerts WHERE created_at >= $1 GROUP BY attack_type ORDER BY count DESC LIMIT 5`, [cutoff]),
+      query(`SELECT DISTINCT ip_address FROM alerts
+             WHERE created_at >= $1 AND severity IN ('critical','high') AND ip_address IS NOT NULL LIMIT 10`, [cutoff]),
+    ]);
+
     const critical = alerts.filter(a => a.severity === 'critical').length;
     const high = alerts.filter(a => a.severity === 'high').length;
     const medium = alerts.filter(a => a.severity === 'medium').length;
     const low = alerts.filter(a => a.severity === 'low').length;
     const riskLevel = critical > 0 ? 'CRITICAL' : high > 3 ? 'HIGH' : high > 0 ? 'MEDIUM' : 'LOW';
-
-    const topThreats = db.prepare(`
-      SELECT attack_type, COUNT(*) as count, MAX(severity) as max_severity
-      FROM alerts WHERE created_at >= ? GROUP BY attack_type ORDER BY count DESC LIMIT 5
-    `).all(cutoff);
-
-    const suspiciousIPs = db.prepare(`
-      SELECT DISTINCT ip_address FROM alerts
-      WHERE created_at >= ? AND severity IN ('critical','high') AND ip_address IS NOT NULL
-      LIMIT 10
-    `).all(cutoff).map(r => r.ip_address);
-
-    const recentAlerts = alerts.filter(a => ['critical','high'].includes(a.severity)).slice(0, 10);
+    const suspiciousIPs = suspiciousIPRows.map(r => r.ip_address);
+    const recentAlerts = alerts.filter(a => ['critical', 'high'].includes(a.severity)).slice(0, 10);
 
     const dbContext = { totalAlerts: alerts.length, critical, high, medium, low, riskLevel, topThreats, suspiciousIPs, recentAlerts };
-
     const result = await generateChatResponse(message.trim(), conversationHistory, dbContext);
     res.json({ success: true, reply: result.reply, source: result.source });
   } catch (err) {

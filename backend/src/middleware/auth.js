@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
-const { getDb } = require('../config/database');
+const { queryOne } = require('../config/database');
 const config = require('../config/config');
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -10,8 +10,7 @@ function authMiddleware(req, res, next) {
     }
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, config.JWT_SECRET);
-    const db = getDb();
-    const user = db.prepare('SELECT id, username, email, role, is_active FROM users WHERE id = ?').get(decoded.id);
+    const user = await queryOne('SELECT id, username, email, role, is_active FROM users WHERE id = $1', [decoded.id]);
     if (!user || !user.is_active) {
       return res.status(401).json({ success: false, message: 'Invalid or expired session.' });
     }

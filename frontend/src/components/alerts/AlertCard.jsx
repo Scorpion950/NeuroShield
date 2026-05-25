@@ -110,6 +110,20 @@ export default function AlertCard({ alert, onStatusChange, onViewInsight, select
                 False +
               </button>
             )}
+            {alert.ip_address && (
+              <button className="btn btn-danger btn-sm" onClick={async () => {
+                try {
+                  const { blockedIpsApi } = await import('../../api/client');
+                  await blockedIpsApi.block({ ip_address: alert.ip_address, reason: `Blocked from alert: ${alert.title}` });
+                  toast.success(`IP ${alert.ip_address} blocked successfully`);
+                } catch (err) {
+                  toast.error(err.message || 'Failed to block IP');
+                }
+              }} disabled={updating}>
+                <Shield size={13} style={{ transform: 'rotate(180deg)' }} />
+                Block IP
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -1,9 +1,13 @@
 const express = require('express');
 const { apiKeyAuth } = require('../middleware/apiKeyAuth');
 const { ingestLog } = require('../services/threatDetection');
+const { query, queryOne, execute } = require('../config/database');
+const { generateAIExplanation } = require('../services/aiProcessor');
+const { broadcastAlert } = require('../services/threatDetection');
+const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
 
-// POST /api/ingest/log - Single log ingestion
+// POST /api/ingest/log
 router.post('/log', apiKeyAuth, async (req, res) => {
   try {
     const { level, message, ip_address, username, endpoint, method, status_code, payload, metadata } = req.body;
@@ -26,7 +30,7 @@ router.post('/log', apiKeyAuth, async (req, res) => {
       application_id: req.sourceApp?.id
     };
 
-    const result = ingestLog(logEntry, req.sourceApp);
+    const result = await ingestLog(logEntry, req.sourceApp);
 
     res.json({
       success: true,
@@ -41,7 +45,7 @@ router.post('/log', apiKeyAuth, async (req, res) => {
   }
 });
 
-// POST /api/ingest/batch - Batch log ingestion
+// POST /api/ingest/batch
 router.post('/batch', apiKeyAuth, async (req, res) => {
   try {
     const { logs } = req.body;
@@ -56,12 +60,8 @@ router.post('/batch', apiKeyAuth, async (req, res) => {
     let totalThreats = 0;
 
     for (const log of logs) {
-      const logEntry = {
-        ...log,
-        source_app: req.sourceApp?.name,
-        application_id: req.sourceApp?.id
-      };
-      const result = ingestLog(logEntry, req.sourceApp);
+      const logEntry = { ...log, source_app: req.sourceApp?.name, application_id: req.sourceApp?.id };
+      const result = await ingestLog(logEntry, req.sourceApp);
       results.push({ logId: result.logId, threats: result.threats.length });
       totalThreats += result.threats.length;
     }
@@ -79,23 +79,15 @@ router.post('/batch', apiKeyAuth, async (req, res) => {
   }
 });
 
-// POST /api/ingest/event - Structured security event
+// POST /api/ingest/event
 router.post('/event', apiKeyAuth, async (req, res) => {
   try {
     const { event_type, severity, title, description, ip_address, username, endpoint, metadata } = req.body;
-
     if (!event_type || !title) {
       return res.status(400).json({ success: false, message: 'event_type and title are required.' });
     }
 
-    // Direct alert creation for pre-classified events
-    const { getDb } = require('../config/database');
-    const { v4: uuidv4 } = require('uuid');
-    const { generateAIExplanation } = require('../services/aiProcessor');
-
-    const db = getDb();
     const alertId = uuidv4();
-
     const alertData = {
       id: alertId, title, description, severity: severity || 'medium',
       attack_type: event_type, ip_address, username, endpoint,
@@ -104,20 +96,20 @@ router.post('/event', apiKeyAuth, async (req, res) => {
     };
     const aiResult = generateAIExplanation(alertData);
 
-    db.prepare(`
+    await execute(`
       INSERT INTO alerts (id, title, description, severity, attack_type, source_app, source_app_id,
         ip_address, username, endpoint, ai_explanation, ai_recommendation, status, metadata)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)
-    `).run(alertId, title, description, severity || 'medium', event_type,
-      req.sourceApp?.name, req.sourceApp?.id, ip_address, username, endpoint,
-      aiResult.explanation, aiResult.recommendation, JSON.stringify(metadata || {}));
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active', $13)
+    `, [alertId, title, description, severity || 'medium', event_type,
+       req.sourceApp?.name, req.sourceApp?.id, ip_address, username, endpoint,
+       aiResult.explanation, aiResult.recommendation, JSON.stringify(metadata || {})]);
 
     if (req.sourceApp?.id) {
-      db.prepare('UPDATE applications SET total_alerts = total_alerts + 1, last_seen = CURRENT_TIMESTAMP WHERE id = ?').run(req.sourceApp.id);
+      execute('UPDATE applications SET total_alerts = total_alerts + 1, last_seen = NOW() WHERE id = $1', [req.sourceApp.id]).catch(() => {});
     }
 
-    const { broadcastAlert } = require('../services/threatDetection');
-    broadcastAlert(db.prepare('SELECT * FROM alerts WHERE id = ?').get(alertId));
+    const fullAlert = await queryOne('SELECT * FROM alerts WHERE id = $1', [alertId]);
+    broadcastAlert(fullAlert);
 
     res.status(201).json({ success: true, message: 'Security event recorded.', alertId });
   } catch (err) {

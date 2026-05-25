@@ -50,9 +50,8 @@ router.post('/login', async (req, res) => {
     status_code: 200,
     metadata: {
       user_agent: userAgent,
-      role: user.role,
-      new_device: Math.random() > 0.7,
-      new_location: Math.random() > 0.8
+      role: user.role
+      // new_device / new_location only set during attack simulations, not real logins
     }
   });
 

@@ -29,18 +29,18 @@ function detectBruteForce(logEntry) {
   if (username) window.usernames.add(username);
   requestWindows.set(key, window);
 
-  if (window.count >= config.THREAT_THRESHOLDS.BRUTE_FORCE_ATTEMPTS) {
-    const severity = window.count >= 20 ? 'critical' : window.count >= 10 ? 'high' : 'medium';
-    return {
-      detected: true,
-      attack_type: config.ATTACK_TYPES.BRUTE_FORCE,
-      severity,
-      title: `Brute Force Attack Detected - ${window.count} Failed Attempts`,
-      description: `${window.count} consecutive failed login attempts detected from IP ${ip_address}${username ? ` targeting account "${username}"` : ''} within the last ${Math.round(config.THREAT_THRESHOLDS.BRUTE_FORCE_WINDOW_MS / 60000)} minutes.`,
-      metadata: { attempt_count: window.count, unique_ips: [...window.ips], target_usernames: [...window.usernames] }
-    };
-  }
-  return null;
+  // Fire alert on every attempt after threshold
+  if (window.count < config.THREAT_THRESHOLDS.BRUTE_FORCE_ATTEMPTS) return null;
+
+  const severity = window.count >= 20 ? 'critical' : window.count >= 10 ? 'high' : 'medium';
+  return {
+    detected: true,
+    attack_type: config.ATTACK_TYPES.BRUTE_FORCE,
+    severity,
+    title: `Brute Force Attack Detected - ${window.count} Failed Attempts`,
+    description: `${window.count} consecutive failed login attempts detected from IP ${ip_address}${username ? ` targeting account "${username}"` : ''} within the last ${Math.round(config.THREAT_THRESHOLDS.BRUTE_FORCE_WINDOW_MS / 60000)} minutes.`,
+    metadata: { attempt_count: window.count, unique_ips: [...window.ips], target_usernames: [...window.usernames] }
+  };
 }
 
 function detectSuspiciousLogin(logEntry) {
@@ -58,12 +58,14 @@ function detectSuspiciousLogin(logEntry) {
 
   const flags = [];
   if (suspiciousCountries.includes(country)) flags.push(`unusual country (${country})`);
-  if (isNewDevice) flags.push('new device');
-  if (isNewLocation) flags.push('new geographic location');
+  // Only flag new_device + new_location together (not individually — too noisy for legit users)
+  if (isNewDevice && isNewLocation) flags.push('new device from new location');
   if (isVpn) flags.push('VPN detected');
   if (isTor) flags.push('Tor exit node detected');
 
-  if (flags.length > 0) {
+  // Require at least 2 suspicious signals OR one of the high-confidence ones (VPN from suspicious country, Tor)
+  const isHighConfidence = isTor || (isVpn && suspiciousCountries.includes(country)) || suspiciousCountries.includes(country);
+  if (flags.length >= 2 || isHighConfidence) {
     const severity = isTor || (isVpn && suspiciousCountries.includes(country)) ? 'high' : 'medium';
     return {
       detected: true,

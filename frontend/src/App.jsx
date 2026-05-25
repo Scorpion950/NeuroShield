@@ -16,6 +16,8 @@ import AIInsights from './pages/AIInsights';
 import IncidentHistory from './pages/IncidentHistory';
 import APIKeys from './pages/APIKeys';
 import Settings from './pages/Settings';
+import BlockedIPs from './pages/BlockedIPs';
+import MiniBank from './pages/MiniBank';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -68,6 +70,8 @@ export default function App() {
             <Route path="/applications" element={<ProtectedRoute><DashboardLayout><Applications /></DashboardLayout></ProtectedRoute>} />
             <Route path="/insights" element={<ProtectedRoute><DashboardLayout><AIInsights /></DashboardLayout></ProtectedRoute>} />
             <Route path="/incidents" element={<ProtectedRoute><DashboardLayout><IncidentHistory /></DashboardLayout></ProtectedRoute>} />
+            <Route path="/blocked-ips" element={<ProtectedRoute><DashboardLayout><BlockedIPs /></DashboardLayout></ProtectedRoute>} />
+            <Route path="/minibank" element={<ProtectedRoute><DashboardLayout><MiniBank /></DashboardLayout></ProtectedRoute>} />
             <Route path="/apikeys" element={<ProtectedRoute><DashboardLayout><APIKeys /></DashboardLayout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
 

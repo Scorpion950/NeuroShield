@@ -80,6 +80,12 @@ export const insightsApi = {
   getTrends: (hours) => api.get('/insights/trends', { params: { hours } })
 };
 
+// Chat
+export const chatApi = {
+  sendMessage: (message, conversationHistory = []) =>
+    api.post('/insights/chat', { message, conversationHistory })
+};
+
 // Incidents
 export const incidentsApi = {
   getIncidents: (params) => api.get('/incidents', { params }),

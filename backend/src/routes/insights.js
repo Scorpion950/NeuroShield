@@ -1,8 +1,9 @@
 const express = require('express');
 const { getDb } = require('../config/database');
 const { authMiddleware } = require('../middleware/auth');
-const { generateDailySummary, generateAIExplanation } = require('../services/aiProcessor');
+const { generateDailySummary, generateAIExplanation, generateChatResponse } = require('../services/aiProcessor');
 const router = express.Router();
+
 
 // GET /api/insights/summary
 router.get('/summary', authMiddleware, (req, res) => {
@@ -105,6 +106,49 @@ router.get('/trends', authMiddleware, (req, res) => {
   } catch (err) {
     console.error('[Insights] Trends error:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch trends.' });
+  }
+});
+
+
+// POST /api/insights/chat
+router.post('/chat', authMiddleware, async (req, res) => {
+  try {
+    const { message, conversationHistory = [] } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message is required.' });
+    }
+
+    const db = getDb();
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    // Gather live DB context
+    const alerts = db.prepare('SELECT * FROM alerts WHERE created_at >= ? ORDER BY created_at DESC').all(cutoff);
+    const critical = alerts.filter(a => a.severity === 'critical').length;
+    const high = alerts.filter(a => a.severity === 'high').length;
+    const medium = alerts.filter(a => a.severity === 'medium').length;
+    const low = alerts.filter(a => a.severity === 'low').length;
+    const riskLevel = critical > 0 ? 'CRITICAL' : high > 3 ? 'HIGH' : high > 0 ? 'MEDIUM' : 'LOW';
+
+    const topThreats = db.prepare(`
+      SELECT attack_type, COUNT(*) as count, MAX(severity) as max_severity
+      FROM alerts WHERE created_at >= ? GROUP BY attack_type ORDER BY count DESC LIMIT 5
+    `).all(cutoff);
+
+    const suspiciousIPs = db.prepare(`
+      SELECT DISTINCT ip_address FROM alerts
+      WHERE created_at >= ? AND severity IN ('critical','high') AND ip_address IS NOT NULL
+      LIMIT 10
+    `).all(cutoff).map(r => r.ip_address);
+
+    const recentAlerts = alerts.filter(a => ['critical','high'].includes(a.severity)).slice(0, 10);
+
+    const dbContext = { totalAlerts: alerts.length, critical, high, medium, low, riskLevel, topThreats, suspiciousIPs, recentAlerts };
+
+    const result = await generateChatResponse(message.trim(), conversationHistory, dbContext);
+    res.json({ success: true, reply: result.reply, source: result.source });
+  } catch (err) {
+    console.error('[Insights] Chat error:', err);
+    res.status(500).json({ success: false, message: 'Failed to generate chat response.' });
   }
 });
 

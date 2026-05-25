@@ -1,4 +1,5 @@
 const config = require('../config/config');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // AI explanation templates for each attack type
 const AI_TEMPLATES = {
@@ -197,4 +198,115 @@ function generateDailySummary(alerts) {
   };
 }
 
-module.exports = { generateAIExplanation, generateDailySummary };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chatbot: Gemini-powered context-aware chat with rule-based fallback
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FALLBACK_RULES = [
+  {
+    keywords: ['top threat', 'main threat', 'biggest threat', 'most common'],
+    answer: (ctx) => `Based on the last 24 hours, your top threats are:\n${ctx.topThreats.map((t, i) => `${i + 1}. **${t.attack_type}** — ${t.count} incident(s) (max severity: ${t.max_severity})`).join('\n')}\n\nFocus your defences on blocking repeated offenders at the firewall level.`
+  },
+  {
+    keywords: ['risk level', 'current risk', 'risk status', 'how bad'],
+    answer: (ctx) => `The current system risk level is **${ctx.riskLevel}**.\n\n• 🔴 Critical alerts: ${ctx.critical}\n• 🟠 High alerts: ${ctx.high}\n• 🟡 Medium alerts: ${ctx.medium}\n• 🟢 Low alerts: ${ctx.low}\n\nTotal alerts in the last 24 hours: **${ctx.totalAlerts}**.`
+  },
+  {
+    keywords: ['brute force', 'brute-force', 'password attack', 'credential'],
+    answer: () => `**Brute Force Attack Mitigation:**\n1. Block the offending IP at the firewall immediately\n2. Enable account lockout after 5 failed attempts\n3. Enforce Multi-Factor Authentication (MFA) for all accounts\n4. Apply rate limiting on auth endpoints (e.g., 10 req/min per IP)\n5. Enable CAPTCHA on login forms\n6. Alert targeted users and force a password reset`
+  },
+  {
+    keywords: ['sql injection', 'sqli', 'sql attack', 'database injection'],
+    answer: () => `**SQL Injection Mitigation:**\n1. Use parameterized queries / prepared statements — never string concatenation\n2. Validate and sanitize ALL user inputs server-side\n3. Enable a Web Application Firewall (WAF) with SQL injection rules\n4. Block the offending IP immediately\n5. Audit database logs for any successful data exfiltration\n6. Review and harden affected endpoints`
+  },
+  {
+    keywords: ['block ip', 'which ip', 'suspicious ip', 'ip to block', 'ips to block'],
+    answer: (ctx) => `IPs from recent **high/critical** alerts that you should consider blocking:\n${ctx.suspiciousIPs.length > 0 ? ctx.suspiciousIPs.map(ip => `• \`${ip}\``).join('\n') : '• No specific IPs flagged in the last 24 hours.'}\n\nBlock these at your firewall or load balancer level.`
+  },
+  {
+    keywords: ['summary', 'summarize', 'what happened', 'today', 'overview'],
+    answer: (ctx) => `**Security Summary for today:**\n\n• Total alerts: **${ctx.totalAlerts}**\n• Risk level: **${ctx.riskLevel}**\n• Critical: ${ctx.critical} | High: ${ctx.high} | Medium: ${ctx.medium} | Low: ${ctx.low}\n\n**Top attack types:**\n${ctx.topThreats.slice(0, 3).map((t, i) => `${i + 1}. ${t.attack_type} (${t.count} incidents)`).join('\n') || 'None detected'}\n\n${ctx.critical > 0 ? '⚠️ IMMEDIATE ACTION REQUIRED — critical threats detected.' : ctx.high > 0 ? 'Review high-severity alerts promptly.' : '✅ No critical threats. Continue monitoring.'}`
+  },
+  {
+    keywords: ['privilege escalation', 'privilege', 'escalation', 'admin access'],
+    answer: () => `**Privilege Escalation Mitigation:**\n1. Immediately lock the affected account\n2. Audit all recent actions performed by that user\n3. Review role and permission assignments in the database\n4. Enforce server-side role validation — never trust client-supplied roles\n5. Implement the Principle of Least Privilege (PoLP)\n6. Initiate a full incident response process`
+  },
+  {
+    keywords: ['ddos', 'dos attack', 'excessive request', 'rate limit', 'flood'],
+    answer: () => `**DDoS / Excessive Requests Mitigation:**\n1. Apply IP-level rate limiting at your load balancer\n2. Enable CDN/DDoS protection (e.g., Cloudflare)\n3. Temporarily block the offending IP range\n4. Implement request throttling on API endpoints\n5. Add CAPTCHA for suspicious traffic patterns\n6. Review auto-scaling rules to absorb legitimate traffic spikes`
+  },
+  {
+    keywords: ['help', 'what can you do', 'what can i ask', 'capabilities', 'hi', 'hello'],
+    answer: () => `I'm the **NeuroShield AI Security Assistant**! Here's what I can help with:\n\n• 📊 **Threat overview** — "What are my top threats today?"\n• 🔴 **Risk level** — "What is the current risk level?"\n• 🛡️ **Remediation** — "How do I mitigate SQL injection?"\n• 🚫 **IP blocking** — "Which IPs should I block?"\n• 📋 **Daily summary** — "Summarize today's incidents"\n• 🔑 **Attack explanations** — "Explain brute force attacks"\n\nJust ask naturally!`
+  }
+];
+
+async function generateChatResponse(userMessage, conversationHistory = [], dbContext = {}) {
+  const ctx = {
+    totalAlerts: dbContext.totalAlerts || 0,
+    critical: dbContext.critical || 0,
+    high: dbContext.high || 0,
+    medium: dbContext.medium || 0,
+    low: dbContext.low || 0,
+    riskLevel: dbContext.riskLevel || 'LOW',
+    topThreats: dbContext.topThreats || [],
+    suspiciousIPs: dbContext.suspiciousIPs || [],
+    recentAlerts: dbContext.recentAlerts || []
+  };
+
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  // ── Gemini path ──────────────────────────────────────────────────────────
+  if (apiKey && apiKey.trim().length > 0) {
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const systemContext = `You are the NeuroShield AI Security Assistant — an expert cybersecurity analyst embedded in the NeuroShield threat detection platform. Answer concisely and helpfully. Use markdown formatting (bold, bullet lists) in responses.
+
+LIVE SECURITY CONTEXT (last 24 hours):
+- Total alerts: ${ctx.totalAlerts}
+- Critical: ${ctx.critical} | High: ${ctx.high} | Medium: ${ctx.medium} | Low: ${ctx.low}
+- Current risk level: ${ctx.riskLevel}
+- Top threats: ${ctx.topThreats.map(t => `${t.attack_type} (${t.count} incidents, max severity: ${t.max_severity})`).join(', ') || 'None'}
+- Suspicious IPs: ${ctx.suspiciousIPs.join(', ') || 'None identified'}
+- Recent critical/high alerts: ${ctx.recentAlerts.slice(0, 5).map(a => `${a.title} [${a.severity}]`).join('; ') || 'None'}
+
+Use this live data to give accurate, context-aware answers. When asked about specific threats or remediation, provide actionable steps. Keep answers under 300 words unless detail is needed.`;
+
+      const history = conversationHistory.slice(-8).map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      }));
+
+      const chat = model.startChat({
+        history: [
+          { role: 'user', parts: [{ text: systemContext }] },
+          { role: 'model', parts: [{ text: 'Understood. I am the NeuroShield AI Security Assistant, ready to help with threat analysis and security recommendations based on live data.' }] },
+          ...history
+        ]
+      });
+
+      const result = await chat.sendMessage(userMessage);
+      return { reply: result.response.text(), source: 'gemini' };
+    } catch (err) {
+      console.error('[ChatBot] Gemini error, falling back to rules:', err.message);
+    }
+  }
+
+  // ── Rule-based fallback ───────────────────────────────────────────────────
+  const msgLower = userMessage.toLowerCase();
+  for (const rule of FALLBACK_RULES) {
+    if (rule.keywords.some(kw => msgLower.includes(kw))) {
+      return { reply: rule.answer(ctx), source: 'rules' };
+    }
+  }
+
+  return {
+    reply: `I'm the NeuroShield Security Assistant. You currently have **${ctx.totalAlerts}** alerts in the last 24 hours with a risk level of **${ctx.riskLevel}**.\n\nI can answer questions about your top threats, risk levels, remediation steps, and suspicious IPs. Try asking:\n• "What are my top threats today?"\n• "How do I mitigate brute force attacks?"\n• "Which IPs should I block?"`,
+    source: 'rules'
+  };
+}
+
+module.exports = { generateAIExplanation, generateDailySummary, generateChatResponse };

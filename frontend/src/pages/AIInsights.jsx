@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
 import { alertsApi } from '../api/client';
 import toast from 'react-hot-toast';
+import AIChatbot from '../components/AIChatbot';
 
 // SQLite stores UTC without 'Z' — append it so date-fns parses correctly
 const parseUTC = (ts) => ts ? new Date(ts.endsWith('Z') ? ts : ts + 'Z') : null;
@@ -263,6 +264,7 @@ export default function AIInsights() {
           </div>
         </div>
       )}
+      <AIChatbot summary={summary} />
     </div>
   );
 }

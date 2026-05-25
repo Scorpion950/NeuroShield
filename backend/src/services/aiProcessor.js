@@ -255,6 +255,7 @@ async function generateChatResponse(userMessage, conversationHistory = [], dbCon
     recentAlerts: dbContext.recentAlerts || []
   };
 
+  let geminiError = null;
   const apiKey = process.env.GEMINI_API_KEY;
 
   // ── Gemini path ──────────────────────────────────────────────────────────
@@ -292,6 +293,7 @@ Use this live data to give accurate, context-aware answers. When asked about spe
       return { reply: result.response.text(), source: 'gemini' };
     } catch (err) {
       console.error('[ChatBot] Gemini error, falling back to rules:', err.message);
+      geminiError = err.message;
     }
   }
 
@@ -303,8 +305,10 @@ Use this live data to give accurate, context-aware answers. When asked about spe
     }
   }
 
+  const offlineReason = geminiError ? `(Google API Error: ${geminiError})` : '(invalid/missing API key in Vercel Environment Variables)';
+
   return {
-    reply: `I am the NeuroShield AI. I heard you say: "${userMessage}".\n\n*Note: My advanced Gemini connection is currently offline (invalid/missing API key), so I am operating in **rules-based mode**.*\n\nI can still help you with live data! Try asking:\n• 📊 "What are my top threats?"\n• 🔴 "What is the current risk level?"\n• 🚫 "Which IPs should I block?"\n• 🛡️ "How to mitigate brute force?"\n\n*(To enable full conversational AI, please add a valid \`GEMINI_API_KEY\` in your backend \`.env\` file.)*`,
+    reply: `I am the NeuroShield AI. I heard you say: "${userMessage}".\n\n*Note: My advanced Gemini connection is currently offline ${offlineReason}, so I am operating in **rules-based mode**.*\n\nI can still help you with live data! Try asking:\n• 📊 "What are my top threats?"\n• 🔴 "What is the current risk level?"\n• 🚫 "Which IPs should I block?"\n• 🛡️ "How to mitigate brute force?"\n\n*(To enable full conversational AI, please ensure your GEMINI_API_KEY is active and Vercel has been redeployed.)*`,
     source: 'rules'
   };
 }

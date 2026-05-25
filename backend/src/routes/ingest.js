@@ -4,7 +4,7 @@ const { ingestLog } = require('../services/threatDetection');
 const { query, queryOne, execute } = require('../config/database');
 const { generateAIExplanation } = require('../services/aiProcessor');
 const { broadcastAlert } = require('../services/threatDetection');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('crypto');
 const router = express.Router();
 
 // POST /api/ingest/log

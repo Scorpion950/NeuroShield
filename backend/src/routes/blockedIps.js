@@ -1,7 +1,7 @@
 const express = require('express');
 const { query, queryOne, execute } = require('../config/database');
 const { authMiddleware } = require('../middleware/auth');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('crypto');
 const router = express.Router();
 
 // GET /api/blocked-ips

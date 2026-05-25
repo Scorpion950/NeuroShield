@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID: uuidv4 } = require('crypto');
 const { query, queryOne, execute } = require('../config/database');
 const { authMiddleware } = require('../middleware/auth');
 const config = require('../config/config');
